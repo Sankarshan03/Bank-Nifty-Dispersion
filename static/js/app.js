@@ -50,7 +50,7 @@ class DispersionMonitor {
         if (this.isLoading) return;
         
         this.isLoading = true;
-        this.showLoading();
+        this.showLoadingIndicator();
         
         try {
             const response = await fetch('/api/dispersion-data');
@@ -71,7 +71,7 @@ class DispersionMonitor {
             this.updateConnectionStatus(false);
         } finally {
             this.isLoading = false;
-            this.hideLoading();
+            this.hideLoadingIndicator();
         }
     }
     
@@ -250,36 +250,36 @@ class DispersionMonitor {
         }
     }
     
-    showLoading() {
-        const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
-        modal.show();
+    showLoadingIndicator() {
+        // Add subtle loading indicator to refresh button
+        const refreshBtn = document.getElementById('refreshBtn');
+        const originalContent = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+        refreshBtn.disabled = true;
+        
+        // Store original content for restoration
+        refreshBtn.dataset.originalContent = originalContent;
     }
     
-    hideLoading() {
-        const modal = bootstrap.Modal.getInstance(document.getElementById('loadingModal'));
-        if (modal) {
-            modal.hide();
+    hideLoadingIndicator() {
+        // Restore refresh button to original state
+        const refreshBtn = document.getElementById('refreshBtn');
+        if (refreshBtn.dataset.originalContent) {
+            refreshBtn.innerHTML = refreshBtn.dataset.originalContent;
+            refreshBtn.disabled = false;
+            delete refreshBtn.dataset.originalContent;
         }
     }
     
     showError(message) {
-        // Create and show error alert
-        const alertDiv = document.createElement('div');
-        alertDiv.className = 'alert alert-danger alert-dismissible fade show position-fixed';
-        alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; max-width: 400px;';
-        alertDiv.innerHTML = `
-            <strong>Error!</strong> ${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
+        // Log error to console instead of showing popup
+        console.error('Dispersion Monitor Error:', message);
         
-        document.body.appendChild(alertDiv);
+        // Update connection status to show error state
+        this.updateConnectionStatus(false);
         
-        // Auto remove after 5 seconds
-        setTimeout(() => {
-            if (alertDiv.parentNode) {
-                alertDiv.parentNode.removeChild(alertDiv);
-            }
-        }, 5000);
+        // Optionally update last update time to show error occurred
+        document.getElementById('lastUpdate').textContent = `Last Update: Error occurred`;
     }
     
     exportData() {
