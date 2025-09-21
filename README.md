@@ -87,6 +87,10 @@ The tool monitors the following BankNifty constituents with their respective wei
 - `GET /api/dispersion-data`: Current dispersion trade data
 - `GET /api/otm-levels?levels=N`: OTM levels analysis (N=1,2,3)
 - `GET /api/constituents`: BankNifty constituents information
+- `GET /api/data-source`: Check current data source status (websocket, polling, or API) and configuration settings
+- `POST /api/control/polling`: Manage polling functionality with start/stop actions and interval configuration
+- `POST /api/control/websocket`:Control WebSocket connection with start/stop actions for real-time data streaming
+
 
 ## Usage
 
