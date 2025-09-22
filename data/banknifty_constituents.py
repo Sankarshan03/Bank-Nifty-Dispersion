@@ -57,7 +57,7 @@ BANKNIFTY_CONSTITUENTS = {
 # BankNifty index configuration
 BANKNIFTY_CONFIG = {
     "symbol": "BANKNIFTY",
-    "lot_size": 15,  # BankNifty lot size
+    "lot_size": 35,  # BankNifty lot size
     "expiry_format": "%d%b%Y"  # Format for expiry dates
 }
 
