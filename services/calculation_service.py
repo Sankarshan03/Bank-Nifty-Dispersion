@@ -4,11 +4,12 @@ import math
 
 from config.settings import Config
 from data.banknifty_constituents import get_constituents, get_banknifty_config
-
+from .data_service import DataService
 logger = logging.getLogger(__name__)
 
 class CalculationService:
-    def __init__(self):
+    def __init__(self, data_service: DataService):
+        self.data_service = data_service
         self.constituents = get_constituents()
         self.banknifty_config = get_banknifty_config()
         self.reference_portfolio = Config.REFERENCE_PORTFOLIO_VALUE
@@ -295,7 +296,7 @@ class CalculationService:
                 otm_call_strike = atm_strike + (level * strike_interval)
                 otm_put_strike = atm_strike - (level * strike_interval)
                 
-                # Get OTM option data (using mock for now, but with proper structure)
+                # Get OTM option data (using real api response data, with proper structure)
                 call_data = self._get_otm_option_data('BANKNIFTY', otm_call_strike, 'CE', level)
                 put_data = self._get_otm_option_data('BANKNIFTY', otm_put_strike, 'PE', level)
                 
@@ -349,7 +350,28 @@ class CalculationService:
             return {}
     
     def _get_otm_option_data(self, symbol: str, strike: float, option_type: str, level: int) -> Dict:
-        """Get OTM option data with level-based pricing"""
+        """Get OTM option data using real API through data_service"""
+        if not self.data_service:
+            logger.warning("No data_service available, using mock data for OTM options")
+            return self._get_mock_otm_option_data(symbol, strike, option_type, level)
+        
+        try:
+            # Get expiry date (same logic as data_service)
+            expiry = self.data_service._get_next_monthly_expiry()
+            
+            # Use data_service._get_option_data for real API call
+            option_data = self.data_service._get_option_data(symbol, strike, option_type, expiry)
+            
+            logger.info(f"Got real OTM option data for {symbol} {strike} {option_type}: LTP={option_data.get('ltp', 'N/A')}")
+            return option_data
+            
+        except Exception as e:
+            logger.error(f"Error getting real OTM option data for {symbol}: {str(e)}")
+            # Fallback to mock data
+            return self._get_mock_otm_option_data(symbol, strike, option_type, level)
+    
+    def _get_mock_otm_option_data(self, symbol: str, strike: float, option_type: str, level: int) -> Dict:
+        """Mock OTM option data as fallback"""
         import random
         
         # Base premium calculation for OTM options (lower than ATM)
