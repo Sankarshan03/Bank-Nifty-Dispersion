@@ -209,10 +209,32 @@ class DataService:
         if self.websocket_active and self.live_quotes:
             instrument_token = self.instrument_tokens.get(symbol)
             if instrument_token and instrument_token in self.live_quotes:
-                return self.live_quotes[instrument_token].get('last_price', 0)
+                price = self.live_quotes[instrument_token].get('last_price', 0)
+                logger.debug(f"Using WebSocket price for {symbol}: {price}")
+                return price
+        
+        # Check if we have cached data from polling
+        if self.polling_active:
+            with self.cache_lock:
+                if 'market_data' in self.data_cache:
+                    cache_age = time.time() - self.cache_timestamp.get('market_data', 0)
+                    if cache_age < self.cache_duration:
+                        # Try to get price from cached market data
+                        cached_data = self.data_cache['market_data']
+                        if symbol == 'NIFTY BANK' and 'banknifty' in cached_data:
+                            price = cached_data['banknifty'].get('spot_price', 0)
+                            if price > 0:
+                                logger.debug(f"Using cached price for {symbol}: {price}")
+                                return price
+                        elif 'constituents' in cached_data and symbol in cached_data['constituents']:
+                            price = cached_data['constituents'][symbol].get('spot_price', 0)
+                            if price > 0:
+                                logger.debug(f"Using cached price for {symbol}: {price}")
+                                return price
         
         # If KiteConnect is not available, use mock data
         if not self.kite:
+            logger.debug(f"Using mock price for {symbol} (no KiteConnect)")
             return self._get_mock_spot_price(symbol)
             
         try:
@@ -226,7 +248,9 @@ class DataService:
             quote = self.kite.quote([instrument_token])
             
             if quote and str(instrument_token) in quote:
-                return quote[str(instrument_token)]['last_price']
+                price = quote[str(instrument_token)]['last_price']
+                logger.debug(f"Using API price for {symbol}: {price}")
+                return price
             else:
                 logger.warning(f"No quote data for {symbol}, using mock data")
                 return self._get_mock_spot_price(symbol)
@@ -234,6 +258,7 @@ class DataService:
         except Exception as e:
             logger.error(f"Error getting spot price for {symbol}: {str(e)}")
             # Return mock data for development
+            logger.debug(f"Using mock price for {symbol} (error fallback)")
             return self._get_mock_spot_price(symbol)
     
     def _get_option_data(self, symbol: str, strike: float, option_type: str, expiry: str) -> Dict:
@@ -309,8 +334,11 @@ class DataService:
         return last_thursday
     
     def _get_mock_spot_price(self, symbol: str) -> float:
-        """Mock spot prices for development"""
-        mock_prices = {
+        """Mock spot prices for development with some variation"""
+        import random
+        
+        # Base mock prices
+        base_prices = {
             "NIFTY BANK": 45000.0,
             "HDFCBANK": 1650.0,
             "ICICIBANK": 950.0,
@@ -323,18 +351,30 @@ class DataService:
             "FEDERALBNK": 150.0,
             "IDFCFIRSTB": 80.0
         }
-        return mock_prices.get(symbol, 100.0)
+        
+        base_price = base_prices.get(symbol, 100.0)
+        
+        # Add some random variation to simulate live data (±2%)
+        variation = random.uniform(-0.02, 0.02)
+        live_price = base_price * (1 + variation)
+        
+        return round(live_price, 2)
     
     def _get_mock_option_data(self, symbol: str, strike: float, option_type: str) -> Dict:
-        """Mock option data for development"""
-        # Simple mock based on moneyness
+        """Mock option data for development with some variation"""
+        import random
+        
+        # Simple mock based on moneyness with variation
         base_premium = strike * 0.02  # 2% of strike as base premium
+        variation = random.uniform(-0.1, 0.1)  # ±10% variation
+        ltp = base_premium * (1 + variation)
+        
         return {
-            'ltp': base_premium,
-            'bid': base_premium * 0.98,
-            'ask': base_premium * 1.02,
-            'volume': 1000,
-            'oi': 5000
+            'ltp': round(ltp, 2),
+            'bid': round(ltp * 0.98, 2),
+            'ask': round(ltp * 1.02, 2),
+            'volume': random.randint(500, 2000),
+            'oi': random.randint(3000, 8000)
         }
     
     def get_banknifty_constituents(self) -> Dict:
@@ -371,8 +411,8 @@ class DataService:
             if callback:
                 self.add_data_callback(callback)
             
-            # Start WebSocket in separate thread
-            self.websocket_thread = threading.Thread(target=self._run_websocket, daemon=True)
+            # Start WebSocket with threaded=True to avoid signal handler issues
+            self.websocket_thread = threading.Thread(target=self._run_websocket_threaded, daemon=True)
             self.websocket_thread.start()
             
             logger.info("WebSocket started successfully")
@@ -382,14 +422,18 @@ class DataService:
             # Fallback to polling
             self.start_polling(callback)
     
-    def _run_websocket(self):
-        """Run WebSocket in separate thread"""
+    def _run_websocket_threaded(self):
+        """Run WebSocket in separate thread with proper threading"""
         try:
             self.websocket_active = True
-            self.kws.connect(threaded=False)
+            # Use threaded=True to avoid signal handler issues
+            self.kws.connect(threaded=True)
         except Exception as e:
             logger.error(f"WebSocket connection error: {str(e)}")
             self.websocket_active = False
+            # Fallback to polling if WebSocket fails
+            logger.info("Falling back to polling due to WebSocket error")
+            self.start_polling()
     
     def _on_websocket_connect(self, ws, response):
         """WebSocket connection callback"""

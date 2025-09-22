@@ -52,6 +52,14 @@ def get_dispersion_data():
         # Calculate dispersion metrics
         dispersion_metrics = calculation_service.calculate_dispersion_premium(market_data)
         
+        # Also calculate OTM data for all levels (1, 2, 3) to keep it updated
+        try:
+            otm_data = calculation_service.calculate_otm_dispersion(market_data, 3)
+            dispersion_metrics['otm_levels'] = otm_data
+        except Exception as otm_error:
+            logger.error(f"Error calculating OTM data: {str(otm_error)}")
+            dispersion_metrics['otm_levels'] = {}
+        
         return jsonify({
             'status': 'success',
             'data': dispersion_metrics,
