@@ -240,20 +240,3 @@ Bank-Nifty-Dispersion/
 │   └── js/app.js          # Frontend logic
 └── requirements.txt       # Dependencies
 ```
-
-### **Contributing**
-1. Fork the repository
-2. Create feature branch
-3. Add comprehensive tests
-4. Submit pull request
-
-## 📞 Support & Contact
-
-For technical issues, feature requests, or questions:
-- Check application logs for detailed error information
-- Verify API credentials and network connectivity
-- Review troubleshooting section above
-
-## ⚠️ Disclaimer
-
-**Important**: This tool is designed for educational and monitoring purposes only. All trading decisions should be based on thorough market analysis, proper risk management, and individual financial circumstances. The developers assume no responsibility for any financial losses incurred through the use of this application. Always consult with qualified financial advisors before making trading decisions.
