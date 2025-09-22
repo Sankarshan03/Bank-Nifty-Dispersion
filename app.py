@@ -19,7 +19,7 @@ CORS(app)
 
 # Initialize services
 data_service = DataService()
-calculation_service = CalculationService()
+calculation_service = CalculationService(data_service)  # Pass data_service to calculation_service
 
 # Start live data updates (WebSocket preferred, polling fallback)
 def data_update_callback(market_data):
