@@ -4,17 +4,17 @@
 BANKNIFTY_CONSTITUENTS = {
     "HDFCBANK": {
         "weight": 28.61,
-        "lot_size": 550,
+        "lot_size": 1100,
         "symbol": "HDFCBANK"
     },
     "ICICIBANK": {
         "weight": 26.05,
-        "lot_size": 1375,
+        "lot_size": 700,
         "symbol": "ICICIBANK"
     },
     "SBIN": {
         "weight": 9.11,
-        "lot_size": 1500,
+        "lot_size": 750,
         "symbol": "SBIN"
     },
     "KOTAKBANK": {
@@ -24,32 +24,32 @@ BANKNIFTY_CONSTITUENTS = {
     },
     "AXISBANK": {
         "weight": 7.82,
-        "lot_size": 1200,
+        "lot_size": 625,
         "symbol": "AXISBANK"
     },
     "INDUSINDBK": {
         "weight": 3.37,
-        "lot_size": 900,
+        "lot_size": 700,
         "symbol": "INDUSINDBK"
     },
     "FEDERALBNK": {
         "weight": 3.25,
-        "lot_size": 10000,
+        "lot_size": 5000,
         "symbol": "FEDERALBNK"
     },
     "IDFCFIRSTB": {
         "weight": 3.11,
-        "lot_size": 10000,
+        "lot_size": 9275,
         "symbol": "IDFCFIRSTB"
     },
     "BANDHANBNK": {
         "weight": 2.98,
-        "lot_size": 1800,
+        "lot_size": 3600,
         "symbol": "BANDHANBNK"
     },
     "AUBANK": {
         "weight": 2.79,
-        "lot_size": 1200,
+        "lot_size": 1000,
         "symbol": "AUBANK"
     }
 }
