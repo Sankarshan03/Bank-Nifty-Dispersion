@@ -6,6 +6,7 @@ class DispersionMonitor {
         this.isLoading = false;
         this.lastUpdateTime = null;
         this.currentData = null;
+        this.selectedOTMLevel = 0; // Default to no OTM levels
         
         this.init();
     }
@@ -56,12 +57,18 @@ class DispersionMonitor {
             const response = await fetch('/api/dispersion-data');
             const result = await response.json();
             
+            console.log('API Response:', result); // Debug logging
+            
             if (result.status === 'success') {
                 this.currentData = result.data;
                 this.updateUI(result.data);
                 this.updateConnectionStatus(true);
+                this.updateDataSource(result.data_source || 'api');
                 this.lastUpdateTime = new Date();
                 this.updateLastUpdateTime();
+                
+                // Show data source in console
+                console.log('Data source:', result.data_source || 'unknown');
             } else {
                 throw new Error(result.message || 'Failed to fetch data');
             }
@@ -76,11 +83,20 @@ class DispersionMonitor {
     }
     
     updateUI(data) {
+        console.log('Updating UI with data:', data); // Debug logging
+        
         this.updateNetPremium(data);
         this.updateBankNiftyPosition(data.banknifty_position);
         this.updateConstituentsPosition(data.constituents_positions);
         this.updateConstituentsTable(data.constituents_positions, data.normalized_lots);
         this.updatePortfolioValue(data.portfolio_value);
+        
+        // Update OTM data if available and OTM section is visible
+        if (data.otm_levels && this.isOTMSectionVisible()) {
+            this.updateOTMSection(data.otm_levels);
+            // Add visual feedback that OTM data is updating
+            this.addOTMUpdateAnimation();
+        }
     }
     
     updateNetPremium(data) {
@@ -111,7 +127,10 @@ class DispersionMonitor {
     updateBankNiftyPosition(position) {
         if (!position) return;
         
-        document.getElementById('bnSpotPrice').textContent = this.formatNumber(position.strike || 0);
+        // Log the position data for debugging
+        console.log('BankNifty Position Data:', position);
+        
+        document.getElementById('bnSpotPrice').textContent = this.formatNumber(position.spot_price || position.strike || 0);
         document.getElementById('bnAtmStrike').textContent = this.formatNumber(position.strike || 0);
         document.getElementById('bnStraddlePremium').textContent = this.formatNumber(position.straddle_price || 0);
         document.getElementById('bnLots').textContent = this.formatNumber(position.lots || 0);
@@ -166,23 +185,65 @@ class DispersionMonitor {
         
         if (levels === '0') {
             otmSection.style.display = 'none';
+            // Hide the live indicator when OTM section is hidden
+            const liveIndicator = document.getElementById('otmLiveIndicator');
+            if (liveIndicator) {
+                liveIndicator.style.display = 'none';
+            }
             return;
         }
         
         otmSection.style.display = 'block';
         
-        try {
-            const response = await fetch(`/api/otm-levels?levels=${levels}`);
-            const result = await response.json();
-            
-            if (result.status === 'success') {
-                this.updateOTMSection(result.data);
-            } else {
-                throw new Error(result.message || 'Failed to fetch OTM data');
+        // Store the selected OTM level for future updates
+        this.selectedOTMLevel = parseInt(levels);
+        
+        // Show the live indicator when OTM section is visible
+        const liveIndicator = document.getElementById('otmLiveIndicator');
+        if (liveIndicator) {
+            liveIndicator.style.display = 'inline-block';
+        }
+        
+        // If we have current data with OTM levels, use it immediately
+        if (this.currentData && this.currentData.otm_levels) {
+            this.updateOTMSection(this.currentData.otm_levels);
+        } else {
+            // Fallback to API call if no cached data
+            try {
+                const response = await fetch(`/api/otm-levels?levels=${levels}`);
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    this.updateOTMSection(result.data);
+                } else {
+                    throw new Error(result.message || 'Failed to fetch OTM data');
+                }
+            } catch (error) {
+                console.error('Error fetching OTM data:', error);
+                this.showError('Failed to fetch OTM data: ' + error.message);
             }
-        } catch (error) {
-            console.error('Error fetching OTM data:', error);
-            this.showError('Failed to fetch OTM data: ' + error.message);
+        }
+    }
+    
+    isOTMSectionVisible() {
+        const otmSection = document.getElementById('otmSection');
+        return otmSection && otmSection.style.display !== 'none';
+    }
+    
+    addOTMUpdateAnimation() {
+        const otmSection = document.getElementById('otmSection');
+        const liveIndicator = document.getElementById('otmLiveIndicator');
+        
+        if (otmSection) {
+            otmSection.classList.add('data-update');
+            setTimeout(() => otmSection.classList.remove('data-update'), 500);
+        }
+        
+        // Show and animate the live indicator
+        if (liveIndicator) {
+            liveIndicator.style.display = 'inline-block';
+            liveIndicator.classList.add('data-update');
+            setTimeout(() => liveIndicator.classList.remove('data-update'), 500);
         }
     }
     
@@ -190,9 +251,26 @@ class DispersionMonitor {
         const otmContent = document.getElementById('otmContent');
         otmContent.innerHTML = '';
         
-        Object.entries(otmData).forEach(([level, data]) => {
+        console.log('OTM Data:', otmData); // Debug logging
+        
+        // Filter OTM data based on selected level
+        const selectedLevel = this.selectedOTMLevel || 1;
+        const filteredData = {};
+        
+        // Show only up to the selected level
+        for (let i = 1; i <= selectedLevel; i++) {
+            const levelKey = `otm_level_${i}`;
+            if (otmData[levelKey]) {
+                filteredData[levelKey] = otmData[levelKey];
+            }
+        }
+        
+        Object.entries(filteredData).forEach(([level, data]) => {
             const levelCard = document.createElement('div');
             levelCard.className = 'card otm-level-card mb-3';
+            
+            const netPremium = data.net_premium || 0;
+            const premiumClass = netPremium > 0 ? 'text-success' : 'text-danger';
             
             levelCard.innerHTML = `
                 <div class="card-header">
@@ -200,15 +278,27 @@ class DispersionMonitor {
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-6">
-                            <h6>BankNifty Position</h6>
-                            <p>Call Strike: ${this.formatNumber(data.banknifty_position?.call_strike || 0)}</p>
-                            <p>Put Strike: ${this.formatNumber(data.banknifty_position?.put_strike || 0)}</p>
+                        <div class="col-md-4">
+                            <h6>BankNifty Position (Buy)</h6>
+                            <p><strong>Spot:</strong> ${this.formatNumber(data.banknifty_position?.spot_price || 0)}</p>
+                            <p><strong>Call Strike:</strong> ${this.formatNumber(data.banknifty_position?.call_strike || 0)}</p>
+                            <p><strong>Put Strike:</strong> ${this.formatNumber(data.banknifty_position?.put_strike || 0)}</p>
+                            <p><strong>Straddle Premium:</strong> ${this.formatNumber(data.banknifty_position?.straddle_price || 0)}</p>
+                            <p><strong>Lots:</strong> ${this.formatNumber(data.banknifty_position?.lots || 0)}</p>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <h6>Constituents (Sell)</h6>
+                            <p><strong>Total Stocks:</strong> ${Object.keys(data.constituents_positions?.positions || {}).length}</p>
+                            <p><strong>Total Premium Received:</strong> ${this.formatCurrency(data.constituents_positions?.total_premium || 0)}</p>
+                            <p><strong>Portfolio Value:</strong> ${this.formatCurrency(data.portfolio_value?.total_value || 0, true)}</p>
+                        </div>
+                        <div class="col-md-4">
                             <h6>Net Premium</h6>
-                            <p class="h5">${this.formatCurrency(data.net_premium || 0)}</p>
+                            <p class="h4 ${premiumClass}">${this.formatCurrency(netPremium)}</p>
                             <small class="text-muted">${data.note || ''}</small>
+                            <hr>
+                            <p><strong>Premium Paid:</strong> ${this.formatCurrency(data.banknifty_position?.premium || 0)}</p>
+                            <p><strong>Premium Received:</strong> ${this.formatCurrency(data.constituents_positions?.total_premium || 0)}</p>
                         </div>
                     </div>
                 </div>
@@ -240,6 +330,26 @@ class DispersionMonitor {
         } else {
             statusElement.textContent = 'Disconnected';
             statusElement.className = 'badge bg-danger';
+        }
+    }
+    
+    updateDataSource(source) {
+        const dataSourceElement = document.getElementById('dataSource');
+        const sourceText = source.toUpperCase();
+        dataSourceElement.textContent = sourceText;
+        
+        // Update badge color based on data source
+        switch(source.toLowerCase()) {
+            case 'websocket':
+                dataSourceElement.className = 'badge bg-success me-2';
+                break;
+            case 'polling':
+                dataSourceElement.className = 'badge bg-warning me-2';
+                break;
+            case 'api':
+            default:
+                dataSourceElement.className = 'badge bg-info me-2';
+                break;
         }
     }
     
